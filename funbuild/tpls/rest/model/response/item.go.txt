@@ -1,0 +1,22 @@
+package response
+
+// ItemResponse is the outbound payload for a single item.
+type ItemResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+// ListItemResponse is the outbound payload for listing items.
+type ListItemResponse struct {
+	Items []ItemResponse `json:"items"`
+	Total int            `json:"total"`
+}
+
+// DeleteItemResponse is the outbound payload for delete operations.
+type DeleteItemResponse struct {
+	ID      string `json:"id"`
+	Deleted bool   `json:"deleted"`
+}

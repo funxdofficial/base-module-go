@@ -1,0 +1,13 @@
+package request
+
+// CreateItemRequest is the inbound payload for creating an item.
+type CreateItemRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// UpdateItemRequest is the inbound payload for updating an item.
+type UpdateItemRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}

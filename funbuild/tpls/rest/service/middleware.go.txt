@@ -1,0 +1,64 @@
+package service
+
+import (
+	"context"
+
+	"github.com/funxdofficial/golang-module-syslog/logger"
+	"github.com/labstack/echo/v4"
+)
+
+type echoRequestInfo struct {
+	c echo.Context
+}
+
+func (r *echoRequestInfo) Method() string {
+	return r.c.Request().Method
+}
+
+func (r *echoRequestInfo) Path() string {
+	return r.c.Request().URL.Path
+}
+
+func (r *echoRequestInfo) Body() string {
+	return ""
+}
+
+func (r *echoRequestInfo) Header(key string) string {
+	return r.c.Request().Header.Get(key)
+}
+
+func (r *echoRequestInfo) Context() context.Context {
+	return r.c.Request().Context()
+}
+
+func echoMiddleware(log *logger.Logger, serviceName string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if log == nil {
+				return next(c)
+			}
+
+			reqInfo := &echoRequestInfo{c: c}
+			ctx := log.StartFromHTTPRequestInfo(reqInfo, logger.StartConfig{
+				ServiceName: serviceName,
+			})
+			c.SetRequest(c.Request().WithContext(ctx))
+
+			err := next(c)
+
+			level := "SUCCESS"
+			status := c.Response().Status
+			switch {
+			case status >= 500:
+				level = "ERROR"
+			case status >= 400:
+				level = "WARNING"
+			case status >= 300:
+				level = "INFO"
+			}
+
+			log.Stop(ctx, level, "Request completed", "")
+			return err
+		}
+	}
+}

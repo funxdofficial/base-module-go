@@ -1,0 +1,37 @@
+package main
+
+import (
+	"os"
+	"time"
+
+	"{{MODULE_PATH}}/config"
+	"{{MODULE_PATH}}/container"
+	"{{MODULE_PATH}}/module"
+)
+
+// ServiceName can be overridden at build time via -ldflags.
+var ServiceName = "{{PKG_NAME}}"
+
+func init() {
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err == nil {
+		time.Local = loc
+	}
+}
+
+func main() {
+	cfg := config.GetConfig()
+	if ServiceName == "" {
+		ServiceName = os.Getenv("SERVICE_NAME")
+	}
+	if cfg.ServiceName == "" {
+		cfg.ServiceName = ServiceName
+	}
+
+	mod, err := module.Init(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	container.InitService(mod)
+}

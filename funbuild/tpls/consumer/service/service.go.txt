@@ -1,0 +1,75 @@
+package service
+
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/service/usecase"
+)
+
+// ServiceInterFace defines the Tier 1 transport entrypoint.
+type ServiceInterFace interface {
+	Run()
+	Shutdown(ctx context.Context) error
+}
+
+type service struct {
+	mod       *module.Module
+	itemUc    usecase.ItemUsecaseInterFace
+	scheduler *SchedulerRunner
+}
+
+// NewService wires the Tier 1 service layer.
+func NewService(mod *module.Module, itemUc usecase.ItemUsecaseInterFace) ServiceInterFace {
+	return &service{
+		mod:    mod,
+		itemUc: itemUc,
+	}
+}
+
+// Run starts cron jobs based on config, then blocks until shutdown.
+func (s *service) Run() {
+	cfg := s.mod.Config
+
+	if cfg.Scheduler.Enabled {
+		runner, err := NewSchedulerRunner(s.mod, s.itemUc)
+		if err != nil {
+			s.mod.Logger.Fatalf("service: scheduler init failed: %v", err)
+		}
+		s.scheduler = runner
+		if err := s.scheduler.Start(); err != nil {
+			s.mod.Logger.Fatalf("service: scheduler start failed: %v", err)
+		}
+	}
+
+	s.mod.Logger.Success("service: application started")
+	s.waitForShutdown()
+	s.stop()
+}
+
+func (s *service) stop() {
+	if s.scheduler != nil {
+		s.scheduler.Stop()
+	}
+	if err := s.mod.Close(); err != nil {
+		s.mod.Logger.Errorf("service: module close failed: %v", err)
+	}
+}
+
+func (s *service) waitForShutdown() {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	s.mod.Logger.Info("service: shutdown signal received")
+}
+
+// Shutdown gracefully stops scheduler and module resources.
+func (s *service) Shutdown(ctx context.Context) error {
+	if s.scheduler != nil {
+		s.scheduler.Stop()
+	}
+	return s.mod.Close()
+}

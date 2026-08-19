@@ -1,0 +1,6 @@
+package constant
+
+const (
+	AppName    = "{{PKG_NAME}}"
+	APIVersion = "v1"
+)

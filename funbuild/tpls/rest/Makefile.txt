@@ -1,0 +1,21 @@
+export SERVICE_NAME={{PKG_NAME}}
+
+help:
+	@echo "Targets: tidy, test, build, run"
+
+tidy:
+	@go mod tidy
+
+test: tidy
+	@go test ./...
+
+build: tidy
+	@mkdir -p bin
+	@go build -ldflags="-s -w -X 'main.ServiceName=${SERVICE_NAME}'" -o ./bin/app .
+
+run: tidy
+	@go run .
+
+run-env:
+	@cp -n .env.example .env 2>/dev/null || true
+	@go run .

@@ -1,0 +1,69 @@
+package service
+
+import (
+	"context"
+
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/service/usecase"
+	"github.com/funxdofficial/golang-module-scheduler/cron"
+	"github.com/funxdofficial/golang-module-syslog/logger"
+)
+
+// SchedulerRunner manages cron jobs from config using golang-module-scheduler.
+type SchedulerRunner struct {
+	mod   *module.Module
+	group *cron.Group
+}
+
+// NewSchedulerRunner builds a scheduler group from application config.
+func NewSchedulerRunner(mod *module.Module, itemUc usecase.ItemUsecaseInterFace) (*SchedulerRunner, error) {
+	group := cron.NewGroupWithLocation(cron.Location())
+	group.Use(cron.Logger())
+	group.Use(cron.Recover(func(info cron.JobInfo, recovered any) {
+		mod.Logger.Errorf("scheduler: job=%s panic: %v", info.Name, recovered)
+	}))
+
+	for _, job := range mod.Config.Scheduler.Jobs {
+		name := job.Name
+		expr := job.Expression
+		if err := group.Handle(name, expr, func() {
+			ctx := logger.WithServiceName(context.Background(), mod.Config.ServiceName)
+			runJob(ctx, mod, itemUc, name)
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	return &SchedulerRunner{
+		mod:   mod,
+		group: group,
+	}, nil
+}
+
+func runJob(ctx context.Context, mod *module.Module, itemUc usecase.ItemUsecaseInterFace, name string) {
+	mod.Logger.InfofCtx(ctx, "scheduler: running job=%s", name)
+
+	switch name {
+	case "heartbeat":
+		items, err := itemUc.List(ctx)
+		if err != nil {
+			mod.Logger.ErrorfCtx(ctx, "scheduler: heartbeat failed: %v", err)
+			return
+		}
+		mod.Logger.InfofCtx(ctx, "scheduler: heartbeat ok, items=%d", len(items))
+	default:
+		mod.Logger.WarningfCtx(ctx, "scheduler: unknown job=%s", name)
+	}
+}
+
+// Start launches all configured cron jobs.
+func (r *SchedulerRunner) Start() error {
+	r.mod.Logger.Infof("scheduler: starting jobs\n%s", r.group.Routes())
+	return r.group.Start()
+}
+
+// Stop stops all cron jobs.
+func (r *SchedulerRunner) Stop() {
+	r.group.Stop()
+	r.mod.Logger.Info("scheduler: stopped")
+}

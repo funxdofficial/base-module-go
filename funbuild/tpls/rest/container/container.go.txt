@@ -1,0 +1,18 @@
+package container
+
+import (
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/service"
+	"{{MODULE_PATH}}/service/controller"
+	"{{MODULE_PATH}}/service/repository"
+	"{{MODULE_PATH}}/service/usecase"
+)
+
+// InitService wires Tier 2 dependencies and starts Tier 1 services.
+func InitService(mod *module.Module) {
+	repo := repository.NewItemRepository(mod)
+	uc := usecase.NewItemUsecase(repo, mod)
+	ctrl := controller.NewItemController(uc, mod)
+	svc := service.NewService(mod, ctrl)
+	svc.Run()
+}

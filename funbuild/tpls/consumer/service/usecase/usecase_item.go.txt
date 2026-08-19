@@ -1,0 +1,77 @@
+package usecase
+
+import (
+	"context"
+	"strings"
+
+	"{{MODULE_PATH}}/model"
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/service/repository"
+)
+
+type itemUsecase struct {
+	repo repository.ItemRepositoryInterFace
+	mod  *module.Module
+}
+
+// NewItemUsecase wires item business logic.
+func NewItemUsecase(repo repository.ItemRepositoryInterFace, mod *module.Module) ItemUsecaseInterFace {
+	return &itemUsecase{
+		repo: repo,
+		mod:  mod,
+	}
+}
+
+func (u *itemUsecase) Create(ctx context.Context, name, description string) (*model.Item, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, ErrInvalidItemName
+	}
+
+	u.mod.Logger.InfofCtx(ctx, "usecase: create item name=%s", name)
+
+	item := &model.Item{
+		Name:        name,
+		Description: strings.TrimSpace(description),
+	}
+	if err := u.repo.Create(ctx, item); err != nil {
+		u.mod.Logger.ErrorfCtx(ctx, "usecase: create failed: %v", err)
+		return nil, err
+	}
+	return item, nil
+}
+
+func (u *itemUsecase) List(ctx context.Context) ([]*model.Item, error) {
+	u.mod.Logger.InfofCtx(ctx, "usecase: list items")
+	return u.repo.FindAll(ctx)
+}
+
+func (u *itemUsecase) GetByID(ctx context.Context, id string) (*model.Item, error) {
+	u.mod.Logger.InfofCtx(ctx, "usecase: get item id=%s", id)
+	return u.repo.FindByID(ctx, id)
+}
+
+func (u *itemUsecase) Update(ctx context.Context, id, name, description string) (*model.Item, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, ErrInvalidItemName
+	}
+
+	u.mod.Logger.InfofCtx(ctx, "usecase: update item id=%s", id)
+
+	item := &model.Item{
+		ID:          id,
+		Name:        name,
+		Description: strings.TrimSpace(description),
+	}
+	if err := u.repo.Update(ctx, item); err != nil {
+		u.mod.Logger.ErrorfCtx(ctx, "usecase: update failed: %v", err)
+		return nil, err
+	}
+	return u.repo.FindByID(ctx, id)
+}
+
+func (u *itemUsecase) Delete(ctx context.Context, id string) error {
+	u.mod.Logger.InfofCtx(ctx, "usecase: delete item id=%s", id)
+	return u.repo.Delete(ctx, id)
+}

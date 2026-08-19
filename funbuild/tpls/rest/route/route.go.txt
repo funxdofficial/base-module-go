@@ -1,0 +1,25 @@
+package route
+
+import (
+	"net/http"
+
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/service/controller"
+	"github.com/labstack/echo/v4"
+)
+
+// Register mounts REST routes on the Echo server.
+func Register(e *echo.Echo, mod *module.Module, itemCtrl controller.ItemControllerInterFace) {
+	e.GET("/health", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	})
+
+	itemRoute := NewItemRoute(itemCtrl)
+	v1 := e.Group("/api/v1")
+	items := v1.Group("/items")
+	items.GET("", itemRoute.List)
+	items.POST("", itemRoute.Create)
+	items.GET("/:id", itemRoute.GetByID)
+	items.PUT("/:id", itemRoute.Update)
+	items.DELETE("/:id", itemRoute.Delete)
+}

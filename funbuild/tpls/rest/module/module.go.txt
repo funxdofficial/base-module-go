@@ -1,0 +1,58 @@
+package module
+
+import (
+	"fmt"
+
+	"{{MODULE_PATH}}/config"
+	"github.com/funxdofficial/golang-module-syslog/logger"
+)
+
+var modul *Module
+
+// GetModule returns the initialized application module.
+func GetModule() *Module {
+	return modul
+}
+
+// Module holds shared infrastructure initialized once at startup.
+type Module struct {
+	Config *config.Config
+	Logger *logger.Logger
+}
+
+// Init creates the shared module: logger and other cross-cutting deps.
+func Init(conf *config.Config) (*Module, error) {
+	logType := logger.LogTypeConsole
+	switch conf.Logger.Type {
+	case "file":
+		logType = logger.LogTypeFile
+	case "all":
+		logType = logger.LogTypeAll
+	}
+
+	appLogger, err := logger.StartLogger(&logger.LoggerConfig{
+		ServiceName: conf.ServiceName,
+		LogFile:     conf.Logger.LogFile,
+		Type:        logType,
+		BufferSize:  conf.Logger.BufferSize,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("module: init logger: %w", err)
+	}
+
+	modul = &Module{
+		Config: conf,
+		Logger: appLogger,
+	}
+
+	appLogger.Successf("module initialized for service=%s", conf.ServiceName)
+	return modul, nil
+}
+
+// Close releases module resources.
+func (m *Module) Close() error {
+	if m == nil || m.Logger == nil {
+		return nil
+	}
+	return m.Logger.Close()
+}

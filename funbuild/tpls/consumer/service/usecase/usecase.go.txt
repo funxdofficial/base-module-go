@@ -1,0 +1,21 @@
+package usecase
+
+import (
+	"context"
+	"errors"
+
+	"{{MODULE_PATH}}/model"
+)
+
+var (
+	ErrInvalidItemName = errors.New("item name is required")
+)
+
+// ItemUsecaseInterFace defines business logic for item CRUD (Tier 2).
+type ItemUsecaseInterFace interface {
+	Create(ctx context.Context, name, description string) (*model.Item, error)
+	List(ctx context.Context) ([]*model.Item, error)
+	GetByID(ctx context.Context, id string) (*model.Item, error)
+	Update(ctx context.Context, id, name, description string) (*model.Item, error)
+	Delete(ctx context.Context, id string) error
+}

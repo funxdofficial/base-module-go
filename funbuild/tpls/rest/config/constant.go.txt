@@ -1,0 +1,6 @@
+package config
+
+import "time"
+
+// ShutdownTimeout is the grace period for HTTP shutdown.
+const ShutdownTimeout = 10 * time.Second
