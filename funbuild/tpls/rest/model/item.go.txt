@@ -1,0 +1,12 @@
+package model
+
+import "time"
+
+// Item represents a dummy domain entity for REST CRUD (Tier 1).
+type Item struct {
+	ID          string
+	Name        string
+	Description string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}

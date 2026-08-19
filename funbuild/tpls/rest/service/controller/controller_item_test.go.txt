@@ -1,0 +1,71 @@
+package controller
+
+import (
+	"context"
+	"testing"
+
+	"{{MODULE_PATH}}/config"
+	"{{MODULE_PATH}}/model/request"
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/service/repository"
+	"{{MODULE_PATH}}/service/usecase"
+)
+
+func TestItemControllerCRUD(t *testing.T) {
+	cfg := config.DefaultConfig()
+	mod, err := module.Init(cfg)
+	if err != nil {
+		t.Fatalf("init module: %v", err)
+	}
+	defer mod.Close()
+
+	repo := repository.NewItemRepository(mod)
+	uc := usecase.NewItemUsecase(repo, mod)
+	ctrl := NewItemController(uc, mod)
+
+	created, err := ctrl.Create(context.Background(), &request.CreateItemRequest{
+		Name:        "Test Item",
+		Description: "from unit test",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if created.ID == "" {
+		t.Fatal("expected non-empty id")
+	}
+
+	got, err := ctrl.GetByID(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Name != "Test Item" {
+		t.Fatalf("unexpected name: %s", got.Name)
+	}
+
+	updated, err := ctrl.Update(context.Background(), created.ID, &request.UpdateItemRequest{
+		Name:        "Updated Item",
+		Description: "updated",
+	})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if updated.Name != "Updated Item" {
+		t.Fatalf("unexpected updated name: %s", updated.Name)
+	}
+
+	list, err := ctrl.List(context.Background())
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if list.Total < 1 {
+		t.Fatalf("expected at least 1 item, got %d", list.Total)
+	}
+
+	deleted, err := ctrl.Delete(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if !deleted.Deleted {
+		t.Fatal("expected deleted=true")
+	}
+}

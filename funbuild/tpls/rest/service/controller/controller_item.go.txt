@@ -1,0 +1,111 @@
+package controller
+
+import (
+	"context"
+	"errors"
+
+	"{{MODULE_PATH}}/model"
+	"{{MODULE_PATH}}/model/request"
+	"{{MODULE_PATH}}/model/response"
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/pkg/helpers"
+	"{{MODULE_PATH}}/service/repository"
+	"{{MODULE_PATH}}/service/usecase"
+)
+
+type itemController struct {
+	usecase usecase.ItemUsecaseInterFace
+	mod     *module.Module
+}
+
+// NewItemController wires the item controller.
+func NewItemController(uc usecase.ItemUsecaseInterFace, mod *module.Module) ItemControllerInterFace {
+	return &itemController{
+		usecase: uc,
+		mod:     mod,
+	}
+}
+
+func (c *itemController) Create(ctx context.Context, req *request.CreateItemRequest) (*response.ItemResponse, error) {
+	c.mod.Logger.InfofCtx(ctx, "controller: create item name=%s", req.Name)
+
+	entity, err := c.usecase.Create(ctx, req.Name, req.Description)
+	if err != nil {
+		c.mod.Logger.ErrorfCtx(ctx, "controller: create failed: %v", err)
+		return nil, err
+	}
+	return toItemResponse(entity), nil
+}
+
+func (c *itemController) List(ctx context.Context) (*response.ListItemResponse, error) {
+	c.mod.Logger.InfofCtx(ctx, "controller: list items")
+
+	items, err := c.usecase.List(ctx)
+	if err != nil {
+		c.mod.Logger.ErrorfCtx(ctx, "controller: list failed: %v", err)
+		return nil, err
+	}
+
+	out := make([]response.ItemResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, *toItemResponse(item))
+	}
+	return &response.ListItemResponse{
+		Items: out,
+		Total: len(out),
+	}, nil
+}
+
+func (c *itemController) GetByID(ctx context.Context, id string) (*response.ItemResponse, error) {
+	c.mod.Logger.InfofCtx(ctx, "controller: get item id=%s", id)
+
+	entity, err := c.usecase.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrItemNotFound) {
+			return nil, err
+		}
+		c.mod.Logger.ErrorfCtx(ctx, "controller: get failed: %v", err)
+		return nil, err
+	}
+	return toItemResponse(entity), nil
+}
+
+func (c *itemController) Update(ctx context.Context, id string, req *request.UpdateItemRequest) (*response.ItemResponse, error) {
+	c.mod.Logger.InfofCtx(ctx, "controller: update item id=%s", id)
+
+	entity, err := c.usecase.Update(ctx, id, req.Name, req.Description)
+	if err != nil {
+		if errors.Is(err, repository.ErrItemNotFound) {
+			return nil, err
+		}
+		c.mod.Logger.ErrorfCtx(ctx, "controller: update failed: %v", err)
+		return nil, err
+	}
+	return toItemResponse(entity), nil
+}
+
+func (c *itemController) Delete(ctx context.Context, id string) (*response.DeleteItemResponse, error) {
+	c.mod.Logger.InfofCtx(ctx, "controller: delete item id=%s", id)
+
+	if err := c.usecase.Delete(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrItemNotFound) {
+			return nil, err
+		}
+		c.mod.Logger.ErrorfCtx(ctx, "controller: delete failed: %v", err)
+		return nil, err
+	}
+	return &response.DeleteItemResponse{
+		ID:      id,
+		Deleted: true,
+	}, nil
+}
+
+func toItemResponse(entity *model.Item) *response.ItemResponse {
+	return &response.ItemResponse{
+		ID:          entity.ID,
+		Name:        entity.Name,
+		Description: entity.Description,
+		CreatedAt:   helpers.FormatDateTime(entity.CreatedAt),
+		UpdatedAt:   helpers.FormatDateTime(entity.UpdatedAt),
+	}
+}

@@ -1,0 +1,17 @@
+package controller
+
+import (
+	"context"
+
+	"{{MODULE_PATH}}/model/request"
+	"{{MODULE_PATH}}/model/response"
+)
+
+// ItemControllerInterFace orchestrates item REST handlers (Tier 2).
+type ItemControllerInterFace interface {
+	Create(ctx context.Context, req *request.CreateItemRequest) (*response.ItemResponse, error)
+	List(ctx context.Context) (*response.ListItemResponse, error)
+	GetByID(ctx context.Context, id string) (*response.ItemResponse, error)
+	Update(ctx context.Context, id string, req *request.UpdateItemRequest) (*response.ItemResponse, error)
+	Delete(ctx context.Context, id string) (*response.DeleteItemResponse, error)
+}

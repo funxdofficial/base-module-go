@@ -1,0 +1,93 @@
+package service
+
+import (
+	"context"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"{{MODULE_PATH}}/config"
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/route"
+	"{{MODULE_PATH}}/service/controller"
+	"github.com/labstack/echo/v4"
+)
+
+// ServiceInterFace defines the Tier 1 transport entrypoint.
+type ServiceInterFace interface {
+	Run()
+	Shutdown(ctx context.Context) error
+}
+
+type service struct {
+	mod        *module.Module
+	itemCtrl   controller.ItemControllerInterFace
+	httpServer *echo.Echo
+}
+
+// NewService wires the Tier 1 service layer.
+func NewService(mod *module.Module, itemCtrl controller.ItemControllerInterFace) ServiceInterFace {
+	return &service{
+		mod:      mod,
+		itemCtrl: itemCtrl,
+	}
+}
+
+// Run starts the HTTP server based on config, then blocks until shutdown.
+func (s *service) Run() {
+	cfg := s.mod.Config
+
+	if cfg.HTTP.Enabled {
+		s.httpServer = s.buildHTTPServer(cfg)
+		go func() {
+			addr := ":" + cfg.HTTP.Port
+			s.mod.Logger.Infof("service: HTTP listening on %s", addr)
+			if err := s.httpServer.Start(addr); err != nil && err != http.ErrServerClosed {
+				s.mod.Logger.Fatalf("service: HTTP server failed: %v", err)
+			}
+		}()
+	}
+
+	s.mod.Logger.Success("service: application started")
+	s.waitForShutdown()
+	s.stop()
+}
+
+func (s *service) stop() {
+	if s.httpServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), config.ShutdownTimeout)
+		defer cancel()
+		if err := s.httpServer.Shutdown(ctx); err != nil {
+			s.mod.Logger.Errorf("service: HTTP shutdown failed: %v", err)
+		}
+	}
+	if err := s.mod.Close(); err != nil {
+		s.mod.Logger.Errorf("service: module close failed: %v", err)
+	}
+}
+
+func (s *service) buildHTTPServer(cfg *config.Config) *echo.Echo {
+	e := echo.New()
+	e.HideBanner = true
+	e.Use(echoMiddleware(s.mod.Logger, cfg.ServiceName))
+	route.Register(e, s.mod, s.itemCtrl)
+	return e
+}
+
+func (s *service) waitForShutdown() {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	s.mod.Logger.Info("service: shutdown signal received")
+}
+
+// Shutdown gracefully stops HTTP and module resources.
+func (s *service) Shutdown(ctx context.Context) error {
+	if s.httpServer != nil {
+		if err := s.httpServer.Shutdown(ctx); err != nil {
+			return err
+		}
+	}
+	return s.mod.Close()
+}

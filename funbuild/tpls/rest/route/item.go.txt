@@ -1,0 +1,91 @@
+package route
+
+import (
+	"errors"
+	"net/http"
+
+	"{{MODULE_PATH}}/model/request"
+	"{{MODULE_PATH}}/service/controller"
+	"{{MODULE_PATH}}/service/repository"
+	"{{MODULE_PATH}}/service/usecase"
+	"github.com/labstack/echo/v4"
+)
+
+// ItemRoute binds item REST endpoints to the controller layer.
+type ItemRoute struct {
+	ctrl controller.ItemControllerInterFace
+}
+
+// NewItemRoute creates item route handlers.
+func NewItemRoute(ctrl controller.ItemControllerInterFace) *ItemRoute {
+	return &ItemRoute{ctrl: ctrl}
+}
+
+func (r *ItemRoute) List(c echo.Context) error {
+	out, err := r.ctrl.List(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, out)
+}
+
+func (r *ItemRoute) Create(c echo.Context) error {
+	req := new(request.CreateItemRequest)
+	if err := c.Bind(req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	out, err := r.ctrl.Create(c.Request().Context(), req)
+	if err != nil {
+		if errors.Is(err, usecase.ErrInvalidItemName) {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusCreated, out)
+}
+
+func (r *ItemRoute) GetByID(c echo.Context) error {
+	id := c.Param("id")
+	out, err := r.ctrl.GetByID(c.Request().Context(), id)
+	if err != nil {
+		if errors.Is(err, repository.ErrItemNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, out)
+}
+
+func (r *ItemRoute) Update(c echo.Context) error {
+	id := c.Param("id")
+	req := new(request.UpdateItemRequest)
+	if err := c.Bind(req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	out, err := r.ctrl.Update(c.Request().Context(), id, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrItemNotFound):
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		case errors.Is(err, usecase.ErrInvalidItemName):
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		default:
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+	}
+	return c.JSON(http.StatusOK, out)
+}
+
+func (r *ItemRoute) Delete(c echo.Context) error {
+	id := c.Param("id")
+	out, err := r.ctrl.Delete(c.Request().Context(), id)
+	if err != nil {
+		if errors.Is(err, repository.ErrItemNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, out)
+}

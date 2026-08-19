@@ -1,0 +1,30 @@
+package helpers
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// Now returns the current time in Asia/Jakarta when available.
+func Now() time.Time {
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		return time.Now()
+	}
+	return time.Now().In(loc)
+}
+
+// FormatDateTime formats a timestamp for JSON responses.
+func FormatDateTime(t time.Time) string {
+	return t.Format("2006-01-02 15:04:05")
+}
+
+// NewID generates a UUID v7 identifier.
+func NewID() string {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return uuid.NewString()
+	}
+	return id.String()
+}

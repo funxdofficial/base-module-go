@@ -1,0 +1,19 @@
+package repository
+
+import (
+	"context"
+	"errors"
+
+	"{{MODULE_PATH}}/model"
+)
+
+var ErrItemNotFound = errors.New("item not found")
+
+// ItemRepositoryInterFace defines data access for items (Tier 2).
+type ItemRepositoryInterFace interface {
+	Create(ctx context.Context, item *model.Item) error
+	FindAll(ctx context.Context) ([]*model.Item, error)
+	FindByID(ctx context.Context, id string) (*model.Item, error)
+	Update(ctx context.Context, item *model.Item) error
+	Delete(ctx context.Context, id string) error
+}

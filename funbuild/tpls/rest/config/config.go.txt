@@ -1,0 +1,95 @@
+package config
+
+import (
+	"os"
+	"strconv"
+
+	"github.com/joho/godotenv"
+)
+
+var config *Config
+
+func init() {
+	config = DefaultConfig()
+	_ = godotenv.Load()
+	applyEnvOverrides(config)
+}
+
+// GetConfig returns the singleton application config.
+func GetConfig() *Config {
+	return config
+}
+
+// Config holds Tier 1 configuration for the whole service.
+type Config struct {
+	ServiceName string
+	App         AppConfig
+	Logger      LoggerConfig
+	HTTP        HTTPConfig
+}
+
+type AppConfig struct {
+	Timezone string
+}
+
+type LoggerConfig struct {
+	Type       string
+	LogFile    string
+	BufferSize int
+}
+
+type HTTPConfig struct {
+	Enabled bool
+	Port    string
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		ServiceName: "{{PKG_NAME}}",
+		App: AppConfig{
+			Timezone: "Asia/Jakarta",
+		},
+		Logger: LoggerConfig{
+			Type:       "console",
+			BufferSize: 1000,
+		},
+		HTTP: HTTPConfig{
+			Enabled: true,
+			Port:    "8080",
+		},
+	}
+}
+
+func applyEnvOverrides(cfg *Config) {
+	if v := os.Getenv("SERVICE_NAME"); v != "" {
+		cfg.ServiceName = v
+	}
+	if v := os.Getenv("APP_TIMEZONE"); v != "" {
+		cfg.App.Timezone = v
+	}
+	if v := os.Getenv("HTTP_PORT"); v != "" {
+		cfg.HTTP.Port = v
+	}
+	if v := os.Getenv("HTTP_ENABLED"); v != "" {
+		cfg.HTTP.Enabled = parseBool(v, cfg.HTTP.Enabled)
+	}
+	if v := os.Getenv("LOG_TYPE"); v != "" {
+		cfg.Logger.Type = v
+	}
+	if v := os.Getenv("LOG_FILE"); v != "" {
+		cfg.Logger.LogFile = v
+	}
+	if v := os.Getenv("LOG_BUFFER_SIZE"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Logger.BufferSize = n
+		}
+	}
+}
+
+func parseBool(value string, fallback bool) bool {
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}

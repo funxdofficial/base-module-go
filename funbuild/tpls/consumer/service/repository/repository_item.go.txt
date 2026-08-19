@@ -1,0 +1,128 @@
+package repository
+
+import (
+	"context"
+	"sort"
+	"sync"
+
+	"{{MODULE_PATH}}/model"
+	"{{MODULE_PATH}}/module"
+	"{{MODULE_PATH}}/pkg/helpers"
+)
+
+type itemRepository struct {
+	mod   *module.Module
+	mu    sync.RWMutex
+	items []*model.Item
+	byID  map[string]int
+}
+
+// NewItemRepository wires an in-memory item repository.
+func NewItemRepository(mod *module.Module) ItemRepositoryInterFace {
+	repo := &itemRepository{
+		mod:   mod,
+		items: make([]*model.Item, 0),
+		byID:  make(map[string]int),
+	}
+	repo.seed()
+	return repo
+}
+
+func (r *itemRepository) seed() {
+	now := helpers.Now()
+	item := &model.Item{
+		ID:          "item-1",
+		Name:        "Sample Item",
+		Description: "Dummy seeded item",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	r.items = append(r.items, item)
+	r.byID[item.ID] = 0
+}
+
+func (r *itemRepository) Create(ctx context.Context, item *model.Item) error {
+	r.mod.Logger.InfofCtx(ctx, "repository: create item name=%s", item.Name)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if item.ID == "" {
+		item.ID = helpers.NewID()
+	}
+	now := helpers.Now()
+	item.CreatedAt = now
+	item.UpdatedAt = now
+	r.byID[item.ID] = len(r.items)
+	r.items = append(r.items, item)
+	return nil
+}
+
+func (r *itemRepository) FindAll(ctx context.Context) ([]*model.Item, error) {
+	r.mod.Logger.InfofCtx(ctx, "repository: list items")
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	out := make([]*model.Item, 0, len(r.items))
+	for i := 0; i < len(r.items); i++ {
+		out = append(out, r.items[i])
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out, nil
+}
+
+func (r *itemRepository) FindByID(ctx context.Context, id string) (*model.Item, error) {
+	r.mod.Logger.InfofCtx(ctx, "repository: find item id=%s", id)
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	idx, ok := r.byID[id]
+	if !ok {
+		return nil, ErrItemNotFound
+	}
+	return r.items[idx], nil
+}
+
+func (r *itemRepository) Update(ctx context.Context, item *model.Item) error {
+	r.mod.Logger.InfofCtx(ctx, "repository: update item id=%s", item.ID)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	idx, ok := r.byID[item.ID]
+	if !ok {
+		return ErrItemNotFound
+	}
+
+	current := r.items[idx]
+	current.Name = item.Name
+	current.Description = item.Description
+	current.UpdatedAt = helpers.Now()
+	return nil
+}
+
+func (r *itemRepository) Delete(ctx context.Context, id string) error {
+	r.mod.Logger.InfofCtx(ctx, "repository: delete item id=%s", id)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	idx, ok := r.byID[id]
+	if !ok {
+		return ErrItemNotFound
+	}
+
+	last := len(r.items) - 1
+	if idx != last {
+		r.items[idx] = r.items[last]
+		r.byID[r.items[idx].ID] = idx
+	}
+	r.items = r.items[:last]
+	delete(r.byID, id)
+	return nil
+}
